@@ -13,6 +13,7 @@ type Router interface {
 func NewServer(routers ...Router) *http.Server {
 	baseRouter := gin.New()
 	baseRouter.Use(middlewares.GinErrorHandler())
+	middlewares.ConfigureGinValidation()
 	for _, router := range routers {
 		router.Register(baseRouter)
 	}

@@ -5,17 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 )
 
 type ProblemDetail struct {
-	Status   int    `json:"status,omitempty"`
-	Title    string `json:"title,omitempty"`
-	Detail   string `json:"detail,omitempty"`
-	Type     string `json:"type,omitempty"`
-	Instance string `json:"instance,omitempty"`
+	Status   int                 `json:"status,omitempty"`
+	Title    string              `json:"title,omitempty"`
+	Detail   string              `json:"detail,omitempty"`
+	Type     string              `json:"type,omitempty"`
+	Instance string              `json:"instance,omitempty"`
+	Errors   map[string][]string `json:"errors,omitempty"`
 }
 
 var mappers = map[reflect.Type]func() ProblemDetailErr{}
@@ -33,6 +35,8 @@ type ProblemDetailErr interface {
 	GetType() string
 	SetInstance(instance string) ProblemDetailErr
 	GetInstance() string
+	SetErrors(map[string][]string) ProblemDetailErr
+	GetErrors() map[string][]string
 }
 
 func (p *ProblemDetail) SetDetail(detail string) ProblemDetailErr {
@@ -83,6 +87,16 @@ func (p *ProblemDetail) SetInstance(instance string) ProblemDetailErr {
 
 func (p *ProblemDetail) GetInstance() string {
 	return p.Instance
+}
+
+func (p *ProblemDetail) SetErrors(errs map[string][]string) ProblemDetailErr {
+	p.Errors = errs
+
+	return p
+}
+
+func (p *ProblemDetail) GetErrors() map[string][]string {
+	return p.Errors
 }
 
 func writeTo(w http.ResponseWriter, p ProblemDetailErr) (int, error) {
@@ -196,6 +210,10 @@ func setDefaultProblemDetails(w http.ResponseWriter, r *http.Request, err error,
 		}
 	}
 	prob := defaultProblem()
+	var verr validator.ValidationErrors
+	if errors.As(err, &verr) {
+		prob.SetErrors(getValidationProblemsDetails(verr))
+	}
 	_, err = writeTo(w, prob)
 	if err != nil {
 		return nil, err
@@ -204,7 +222,9 @@ func setDefaultProblemDetails(w http.ResponseWriter, r *http.Request, err error,
 }
 
 func validationProblems(problem ProblemDetailErr, err error, r *http.Request) {
-	problem.SetDetail(err.Error())
+	if problem.GetDetails() == "" {
+		problem.SetDetail(err.Error())
+	}
 
 	if problem.GetStatus() == 0 {
 		problem.SetStatus(http.StatusInternalServerError)
@@ -218,6 +238,26 @@ func validationProblems(problem ProblemDetailErr, err error, r *http.Request) {
 	if problem.GetTitle() == "" {
 		problem.SetTitle(http.StatusText(problem.GetStatus()))
 	}
+
+	if len(problem.GetErrors()) == 0 {
+		var verr validator.ValidationErrors
+		if errors.As(err, &verr) {
+			problem.SetErrors(getValidationProblemsDetails(verr))
+		}
+	}
+}
+
+func getValidationProblemsDetails(err validator.ValidationErrors) map[string][]string {
+	errs := make(map[string][]string)
+	for _, validation := range err {
+		validationErr := validation.ActualTag()
+		if validation.Param() != "" {
+			validationErr = fmt.Sprintf("%s=%s", validationErr, validation.Param())
+		}
+		errs[validation.Field()] = append(errs[validation.Field()], validationErr)
+	}
+
+	return errs
 }
 
 func getDefaultType(statusCode int) string {
