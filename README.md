@@ -25,7 +25,7 @@ a default one.
 
 ## Roadmap
 
-- [] Add configuration for the server based on environment or config files
+- [ ] Add configuration for the server based on environment or config files
 
 ## Credits
 
