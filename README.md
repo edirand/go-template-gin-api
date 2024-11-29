@@ -14,14 +14,7 @@ You can start a new project with this template using [gonew](https://go.dev/blog
 ```shell
 gonew github.com/edirand/go-template-gin-api <destination_module>
 ```
-
-Once the project ready, run the following command to initialize the project:
-```shell
-make setup
-```
-
-The script will replace all the references to go-template-gin-api with your project name and replace this readme with 
-a default one.
+Once the project ready, you can replace this README by your own. A default readme is provided in the docs folder to help you.
 
 ## Roadmap
 
